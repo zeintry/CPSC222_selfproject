@@ -1,7 +1,6 @@
 import functions as func
 import pandas as pd
 import matplotlib.pyplot as plt
-import calendar
 
 def main():
     # the cleaning step is commented out since the data only needs to be cleaned once and outputted 
@@ -12,7 +11,7 @@ def main():
     # plot the month versus number of steps
     for key, group in steps_data_df.groupby(pd.Grouper(key='creationDate', freq='D')):
         plt.bar(str(key.month) + '/' + str(key.day), sum(group['value']))
-    plt.xticks(rotation='90')
+    plt.xticks(spacing=1.1, rotation='90')
     plt.xlabel('Days since 7/01/2020')
     plt.ylabel('Number of steps')
     plt.show()

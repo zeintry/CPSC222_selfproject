@@ -1,9 +1,8 @@
-from datetime import datetime
 import xml.etree.ElementTree as ET
 import pandas as pd
 import datetime as dt
 import numpy as np
-from pandas.core.tools.datetimes import to_datetime
+import matplotlib.pyplot as plt
 
 def clean_xml(filename, save=False):
     '''
