@@ -1,8 +1,12 @@
+from datetime import datetime
 import xml.etree.ElementTree as ET
 import pandas as pd
 import datetime as dt
 import numpy as np
+from pandas.core.tools.datetimes import to_datetime
 import matplotlib.pyplot as plt
+import requests
+import json
 
 def clean_xml(filename, save=False):
     '''
@@ -21,7 +25,8 @@ def clean_xml(filename, save=False):
     endDates = []
     units = []
     recordTypes = []
-
+    
+    # traverse xml fro data
     for node in root.findall('.//Record[@type="HKQuantityTypeIdentifierStepCount"]'):    
         # only store nodes past a certain date
         if (node.get('creationDate') >= "2020-07-01 00:00:00 -0700"):
@@ -35,18 +40,99 @@ def clean_xml(filename, save=False):
     cleaned_data_df = pd.DataFrame({"recordType" : recordTypes, "unit" : units, "creationDate" : credate, "startDate" : startDates, "endDate" : endDates, "value" : values}, 
                     columns=["recordType","unit","creationDate","startDate","endDate","value"])
     cleaned_data_df.creationDate = to_datetime(cleaned_data_df.creationDate)
+    
+    # format timestamps as UNIX timestamps for easier classification later
+    cleaned_data_df['startDate'] = cleaned_data_df['startDate'].values.astype(np.int64) // 10 ** 9
+    cleaned_data_df['endDate'] = cleaned_data_df['endDate'].values.astype(np.int64) // 10 ** 9
+    
+    # store data if necessary
     if save:
         cleaned_data_df.to_csv('cleaned_apple_steps.csv', index=False)
 
     return cleaned_data_df
     pass
 
-def print_bar(data, xlabel_str='', ylabel_str=None, custom_rot=None):
-    plt.figure()  
-    # plot the month versus number of steps
-    for key, group in data.groupby(pd.Grouper(key='creationDate', freq='D')):
-        plt.bar(str(key.month) + '/' + str(key.day), sum(group['value']))
-    plt.xticks(rotation=custom_rot)
-    plt.xlabel(xlabel_str)
-    plt.ylabel(ylabel_str)
+def plot_by_weekday(data):    
+    # plot the day of week versus number of steps
+    plt.figure()
+    for key, group in data:
+        plt.bar(str(key), sum(group['value']))
+    plt.xlabel('Day of Week (0 = Monday)')
+    plt.ylabel('Total number of steps')
+    plt.title('Step count by day of the week')
     plt.show()
+    
+def plot_by_day(data):
+    # plot the day versus number of steps
+    plt.figure()
+    for key, group in data:
+        plt.bar(str(key.month) + '/' + str(key.day), sum(group['value']))
+    plt.xticks(rotation='90')
+    plt.xlabel('Days since 7/01/2020')
+    plt.ylabel('Number of steps')
+    plt.title('Daily step count')
+    plt.show()
+    
+def plot_by_week(data):
+    # plot the week versus number of steps
+    plt.figure()
+    for key, group in data:
+        plt.bar(str(key.week - 27), sum(group['value']))
+    plt.xlabel('Weeks since 7/01/2020')
+    plt.ylabel('Number of steps')
+    plt.title('Step count by week')
+    plt.show()
+    
+def plot_by_month(data):
+    # plot the month versus number of steps
+    plt.figure()
+    for key, group in data:
+        plt.bar(str(key), sum(group['value']))
+    plt.xlabel('Month')
+    plt.ylabel('Number of steps')
+    plt.title('Step count by month')
+    plt.show()
+    
+def mark_holidays(data, json_object):
+    # mark days with a holiday with a one on dataset
+    holidays = json_object['response']['holidays']
+
+    for holiday in holidays:
+        if (holiday['date']['iso'][0:10] < '2020-07-01'):
+            pass
+        else:
+            for row in range(len(data['date'])):
+                if (holiday['date']['iso'][0:10] == str(data.loc[row, 'date'])[0:10]):
+                    data.at[row, 'holiday'] = 1
+                    break;
+        
+    data.to_csv('hol.csv')
+def get_holidays():
+    calendar_key = 'f73bce93a56ceebc4bed8fba53ea2f53e3044458'
+
+    url = 'https://calendarific.com/api/v2/holidays'
+    url += f"?api_key={calendar_key}"
+    url += '&country=US'
+    url += '&year=2020'
+
+    response = requests.get(url=url)
+    return json.loads(response.text)
+
+def append_classification_info(data):
+    data['day of week'] = pd.DatetimeIndex(data['date']).weekday
+    data['month'] = pd.DatetimeIndex(data['date']).month
+    data['school'] = [0] * len(data['date'])
+    for row in range(len(data['date'])):
+                if (data.loc[row, 'date'] >= '2020-09-01'):
+                    data.at[row, 'school'] = 1
+                else:
+                    data.at[row, 'school'] = 0
+                    
+def get_weather():
+    weather_key = ''
+    
+    url = ''
+    
+    
+    response = requests.get(url=url)
+    return json.loads(response.text)
