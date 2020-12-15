@@ -7,6 +7,8 @@ from pandas.core.tools.datetimes import to_datetime
 import matplotlib.pyplot as plt
 import requests
 import json
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import LabelEncoder
 
 def clean_xml(filename, save=False):
     '''
@@ -44,6 +46,10 @@ def clean_xml(filename, save=False):
     # format timestamps as UNIX timestamps for easier classification later
     cleaned_data_df['startDate'] = cleaned_data_df['startDate'].values.astype(np.int64) // 10 ** 9
     cleaned_data_df['endDate'] = cleaned_data_df['endDate'].values.astype(np.int64) // 10 ** 9
+    # add columns to distinguish datetimes by week day and month
+    cleaned_data_df['day of week (numeric)'] = pd.DatetimeIndex(cleaned_data_df['creationDate']).weekday
+    cleaned_data_df['day of week (string)'] = pd.DatetimeIndex(cleaned_data_df['creationDate']).strftime('%A')
+    cleaned_data_df['month'] = pd.DatetimeIndex(cleaned_data_df['creationDate']).month
     
     # store data if necessary
     if save:
@@ -93,6 +99,16 @@ def plot_by_month(data):
     plt.title('Step count by month')
     plt.show()
     
+def plot_by_holiday(data):
+    plt.figure()
+    for key, group in data.groupby(['holiday']):
+        plt.bar(str(key), sum(group['value'])/ len(group['value']))
+        
+    plt.title('Average step count on holiday vs non-holiday')
+    plt.xlabel('Not Holiday (0), Holiday (1)')
+    plt.ylabel('Average step count')
+    plt.show()
+    
 def mark_holidays(data, json_object):
     # mark days with a holiday with a one on dataset
     holidays = json_object['response']['holidays']
@@ -105,8 +121,7 @@ def mark_holidays(data, json_object):
                 if (holiday['date']['iso'][0:10] == str(data.loc[row, 'date'])[0:10]):
                     data.at[row, 'holiday'] = 1
                     break;
-        
-    data.to_csv('hol.csv')
+                    
 def get_holidays():
     calendar_key = 'f73bce93a56ceebc4bed8fba53ea2f53e3044458'
 
@@ -118,7 +133,7 @@ def get_holidays():
     response = requests.get(url=url)
     return json.loads(response.text)
 
-def append_classification_info(data):
+def append_classification_info(data, holiday_response):
     data['day of week'] = pd.DatetimeIndex(data['date']).weekday
     data['month'] = pd.DatetimeIndex(data['date']).month
     data['school'] = [0] * len(data['date'])
@@ -128,11 +143,23 @@ def append_classification_info(data):
                 else:
                     data.at[row, 'school'] = 0
                     
-def get_weather():
-    weather_key = ''
-    
-    url = ''
-    
-    
-    response = requests.get(url=url)
-    return json.loads(response.text)
+    # mark holidays
+    data['holiday'] = [0] * len(data['date'])
+    mark_holidays(data, holiday_response)
+                    
+def group_by_day(input_data, output):
+    data = input_data.groupby(pd.Grouper(key='creationDate', freq='D'))
+    index = 0
+    for key, value in data:
+        output.loc[index, 'date'] = str(key)[0:10]
+        output.loc[index, 'value'] = sum(value['value'])
+        index += 1
+        
+def preprocess(X):
+    # apply preprocessing to data
+    scaler = MinMaxScaler()
+    le = LabelEncoder()
+
+    # reshape for the min maxer
+    X['month'] = scaler.fit_transform(X['month'].values.reshape(-1,1))
+    X['date'] = le.fit_transform(X['date'])
