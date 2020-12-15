@@ -123,6 +123,9 @@ def mark_holidays(data, json_object):
                     break;
                     
 def get_holidays():
+    '''
+    function to call API and get response
+    '''
     calendar_key = 'f73bce93a56ceebc4bed8fba53ea2f53e3044458'
 
     url = 'https://calendarific.com/api/v2/holidays'
@@ -134,6 +137,9 @@ def get_holidays():
     return json.loads(response.text)
 
 def append_classification_info(data, holiday_response):
+    '''
+    Will add custom classification columns to dataset
+    '''
     data['day of week'] = pd.DatetimeIndex(data['date']).weekday
     data['month'] = pd.DatetimeIndex(data['date']).month
     data['school'] = [0] * len(data['date'])
@@ -148,6 +154,9 @@ def append_classification_info(data, holiday_response):
     mark_holidays(data, holiday_response)
                     
 def group_by_day(input_data, output):
+    '''
+    custom group by day function
+    '''
     data = input_data.groupby(pd.Grouper(key='creationDate', freq='D'))
     index = 0
     for key, value in data:
@@ -156,6 +165,9 @@ def group_by_day(input_data, output):
         index += 1
         
 def preprocess(X):
+    '''
+    Applies preprocessing to X
+    '''
     # apply preprocessing to data
     scaler = MinMaxScaler()
     le = LabelEncoder()
